@@ -1,6 +1,8 @@
 from fastapi import FastAPI, File, UploadFile, HTTPException
 from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from fastapi.responses import FileResponse
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -226,8 +228,11 @@ async def predict(file: UploadFile = File(...)):
 @app.get("/")
 async def root():
     """Root endpoint"""
-    return {"message": "OCT Image Analysis API. POST an image to /predict/ to get predictions."}
+    return FileResponse("static/index.html")
+    # return {"message": "OCT Image Analysis API. POST an image to /predict/ to get predictions."}
 
+# Mount static files directory
+app.mount("/static", StaticFiles(directory="static"), name="static")
 
 if __name__ == "__main__":
     import uvicorn
