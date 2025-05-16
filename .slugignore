@@ -6,3 +6,11 @@
 *.git
 *.DS_Store
 best_model.pth
+*.psd
+*.pdf
+/tests
+/docs
+*.md
+/examples
+*.txt
+!requirements.txt
