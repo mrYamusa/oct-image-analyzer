@@ -13,4 +13,3 @@ best_model.pth
 *.md
 /examples
 *.txt
-!requirements.txt
