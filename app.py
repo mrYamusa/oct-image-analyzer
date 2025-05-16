@@ -16,6 +16,7 @@ import base64
 import matplotlib.pyplot as plt
 from typing import Dict, List
 import os
+from huggingface_hub import hf_hub_download
 
 # Define the model architecture
 class RetinalModel(nn.Module):
@@ -82,6 +83,7 @@ transform = transforms.Compose([
 ])
 
 # Using FastAPI lifespan instead of on_event which is deprecated
+"""
 @app.on_event("startup")
 async def load_model():
     global model
@@ -104,6 +106,20 @@ async def load_model():
         print(f"Error loading model: {e}")
         # Initialize with random weights if checkpoint not found
         model.eval()
+    """
+@app.on_event("startup")
+async def load_model():
+    global model
+    model = RetinalModel(num_classes=len(CLASS_NAMES)).to(device)
+
+    checkpoint_path = hf_hub_download(
+        repo_id="mryamusa/oct-image-analyzer",
+        filename="best_model.pth",
+        repo_type="model"
+    )
+
+    model.load_state_dict(torch.load(checkpoint_path, map_location=device))
+    model.eval()
 
 def generate_grad_cam(model, img_tensor, target_class=None):
     """Generate Grad-CAM for the given image tensor"""
