@@ -1,0 +1,10 @@
+__pycache__/
+*.py[cod]
+*$py.class
+.git
+.env
+env/
+venv/
+ENV/
+Aptfile
+runtime.txt
