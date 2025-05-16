@@ -1,7 +1,7 @@
 fastapi==0.104.1
 uvicorn==0.23.2
-torch==2.5.1
-torchvision==0.20.1
+torch==2.5.1+cpu
+torchvision==0.20.1+cpu
 python-multipart==0.0.6
 pillow==10.0.1
 opencv-python==4.8.1.78
