@@ -1,0 +1,34 @@
+# Python virtual environment
+octvenv/
+venv/
+env/
+
+# Python cache files
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Distribution / packaging
+dist/
+build/
+*.egg-info/
+
+# Local development files
+.env
+.env.local
+
+# IDE files
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS specific files
+.DS_Store
+Thumbs.db
+
+# PyTorch models (depending on size, you might want to add to Heroku separately)
+*.pth
+*.pt
+*.bin

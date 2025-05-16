@@ -1,0 +1,273 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>OCT Image Analysis</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        max-width: 1000px;
+        margin: 0 auto;
+        padding: 20px;
+        line-height: 1.6;
+      }
+      h1 {
+        color: #2c3e50;
+        text-align: center;
+      }
+      .container {
+        display: flex;
+        flex-direction: column;
+        gap: 20px;
+      }
+      .upload-section {
+        background-color: #f9f9f9;
+        padding: 20px;
+        border-radius: 5px;
+      }
+      .result-section {
+        display: none;
+        background-color: #f9f9f9;
+        padding: 20px;
+        border-radius: 5px;
+      }
+      .images-container {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 15px;
+        justify-content: center;
+        margin-top: 20px;
+      }
+      .image-item {
+        display: flex;
+        flex-direction: column;
+        align-items: center;
+      }
+      .image-item img {
+        width: 300px;
+        height: 300px;
+        object-fit: contain;
+        border: 1px solid #ddd;
+        border-radius: 5px;
+      }
+      .image-item h3 {
+        margin: 10px 0;
+      }
+      #prediction-info {
+        background-color: #e8f4f8;
+        padding: 15px;
+        border-radius: 5px;
+        margin-top: 10px;
+      }
+      #file-input {
+        margin: 10px 0;
+      }
+      button {
+        background-color: #3498db;
+        color: white;
+        padding: 10px 15px;
+        border: none;
+        border-radius: 5px;
+        cursor: pointer;
+        font-size: 16px;
+      }
+      button:hover {
+        background-color: #2980b9;
+      }
+      .progress {
+        display: none;
+        text-align: center;
+        margin: 20px 0;
+      }
+      .probability-bars {
+        margin-top: 20px;
+      }
+      .prob-bar {
+        margin-bottom: 10px;
+      }
+      .prob-bar-label {
+        display: flex;
+        justify-content: space-between;
+      }
+      .prob-bar-fill {
+        background-color: #3498db;
+        height: 20px;
+        border-radius: 3px;
+        transition: width 0.5s ease-in-out;
+      }
+      .error {
+        color: #e74c3c;
+        text-align: center;
+        margin-top: 10px;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>OCT Image Analysis</h1>
+
+    <div class="container">
+      <div class="upload-section">
+        <h2>Upload an OCT Image</h2>
+        <p>Upload a retinal OCT image to analyze and predict the condition.</p>
+        <input type="file" id="file-input" accept="image/*" />
+        <button id="submit-btn">Analyze Image</button>
+        <div id="error-message" class="error"></div>
+      </div>
+
+      <div class="progress" id="progress">
+        <p>Processing image, please wait...</p>
+      </div>
+
+      <div class="result-section" id="result-section">
+        <h2>Analysis Results</h2>
+
+        <div id="prediction-info">
+          <h3>Prediction: <span id="prediction-label"></span></h3>
+          <p>Confidence: <span id="prediction-confidence"></span></p>
+        </div>
+
+        <div class="probability-bars" id="probability-bars">
+          <h3>Class Probabilities</h3>
+          <!-- Probability bars will be inserted here -->
+        </div>
+
+        <div class="images-container">
+          <div class="image-item">
+            <h3>Original Image</h3>
+            <img id="original-image" src="" alt="Original Image" />
+          </div>
+          <div class="image-item">
+            <h3>Heatmap</h3>
+            <img id="heatmap-image" src="" alt="Heatmap" />
+          </div>
+          <div class="image-item">
+            <h3>Overlay</h3>
+            <img id="overlay-image" src="" alt="Overlay" />
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      document.addEventListener("DOMContentLoaded", function () {
+        const fileInput = document.getElementById("file-input");
+        const submitBtn = document.getElementById("submit-btn");
+        const progressSection = document.getElementById("progress");
+        const resultSection = document.getElementById("result-section");
+        const errorMessage = document.getElementById("error-message");
+
+        const predictionLabel = document.getElementById("prediction-label");
+        const predictionConfidence = document.getElementById(
+          "prediction-confidence"
+        );
+        const probabilityBars = document.getElementById("probability-bars");
+
+        const originalImage = document.getElementById("original-image");
+        const heatmapImage = document.getElementById("heatmap-image");
+        const overlayImage = document.getElementById("overlay-image");
+
+        // API endpoint
+        const apiUrl = "http://localhost:8000/predict/";
+
+        submitBtn.addEventListener("click", async function () {
+          // Check if file is selected
+          if (!fileInput.files || fileInput.files.length === 0) {
+            errorMessage.textContent = "Please select an image file";
+            return;
+          }
+
+          const file = fileInput.files[0];
+
+          // Check if file is an image
+          if (!file.type.startsWith("image/")) {
+            errorMessage.textContent = "Please select a valid image file";
+            return;
+          }
+
+          // Clear previous error message
+          errorMessage.textContent = "";
+
+          // Show progress
+          progressSection.style.display = "block";
+          resultSection.style.display = "none";
+
+          // Create form data
+          const formData = new FormData();
+          formData.append("file", file);
+
+          try {
+            // Send API request
+            const response = await fetch(apiUrl, {
+              method: "POST",
+              body: formData,
+            });
+
+            if (!response.ok) {
+              throw new Error(`HTTP error! Status: ${response.status}`);
+            }
+
+            const data = await response.json();
+
+            // Update UI with results
+            predictionLabel.textContent = data.prediction;
+            predictionConfidence.textContent = `${(
+              data.confidence * 100
+            ).toFixed(2)}%`;
+
+            // Display images
+            originalImage.src = `data:image/png;base64,${data.images.original}`;
+            heatmapImage.src = `data:image/png;base64,${data.images.heatmap}`;
+            overlayImage.src = `data:image/png;base64,${data.images.overlay}`;
+
+            // Create probability bars
+            createProbabilityBars(data.class_probabilities);
+
+            // Show results
+            resultSection.style.display = "block";
+          } catch (error) {
+            console.error("Error:", error);
+            errorMessage.textContent = `Error processing image: ${error.message}`;
+          } finally {
+            // Hide progress
+            progressSection.style.display = "none";
+          }
+        });
+
+        function createProbabilityBars(probabilities) {
+          // Clear previous bars
+          probabilityBars.innerHTML = "<h3>Class Probabilities</h3>";
+
+          // Create bar for each class
+          Object.entries(probabilities).forEach(([className, probability]) => {
+            const percentage = (probability * 100).toFixed(2);
+
+            const barContainer = document.createElement("div");
+            barContainer.className = "prob-bar";
+
+            const barLabel = document.createElement("div");
+            barLabel.className = "prob-bar-label";
+
+            const nameSpan = document.createElement("span");
+            nameSpan.textContent = className;
+
+            const valueSpan = document.createElement("span");
+            valueSpan.textContent = `${percentage}%`;
+
+            barLabel.appendChild(nameSpan);
+            barLabel.appendChild(valueSpan);
+
+            const barFill = document.createElement("div");
+            barFill.className = "prob-bar-fill";
+            barFill.style.width = `${percentage}%`;
+
+            barContainer.appendChild(barLabel);
+            barContainer.appendChild(barFill);
+
+            probabilityBars.appendChild(barContainer);
+          });
+        }
+      });
+    </script>
+  </body>
+</html>
