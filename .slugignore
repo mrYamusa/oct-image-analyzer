@@ -1,0 +1,8 @@
+# .slugignore
+*.log
+*.md
+*.csv
+*.pyc
+*.git
+*.DS_Store
+best_model.pth
