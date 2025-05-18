@@ -8,3 +8,5 @@ venv/
 ENV/
 Aptfile
 runtime.txt
+.dockerignore
+Dockerfile

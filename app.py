@@ -16,49 +16,102 @@ import base64
 import matplotlib.pyplot as plt
 from typing import Dict, List
 import os
-from huggingface_hub import hf_hub_download
+from contextlib import asynccontextmanager
+import logging
+
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+# Class names mapping
+CLASS_NAMES = ['CNV', 'DME', 'DRUSEN', 'NORMAL']
+IMG_SIZE = 224
 
 # Define the model architecture
 class RetinalModel(nn.Module):
     def __init__(self, num_classes=4):
         super().__init__()
         # Load the torchvision EfficientNet-B3 with pretrained weights
-        # Use a different approach to avoid hash verification issues
-        # base = models.efficientnet_b3(pretrained=False)
-        base = models.efficientnet_b3(weights=models.EfficientNet_B3_Weights.IMAGENET1K_V1)
+        self.base = models.efficientnet_b3(weights=models.EfficientNet_B3_Weights.IMAGENET1K_V1)
         
         # Freeze feature extractor
-        for p in base.features.parameters():
+        for p in self.base.features.parameters():
             p.requires_grad = False
         
         # Replace classifier with custom head
-        in_feats = base.classifier[1].in_features
-        base.classifier = nn.Sequential(
+        in_feats = self.base.classifier[1].in_features
+        self.base.classifier = nn.Sequential(
             nn.Dropout(0.3, inplace=True),
             nn.Linear(in_feats, 512),
             nn.ReLU(),
             nn.Dropout(0.3),
             nn.Linear(512, num_classes)
         )
-        
-        # Expose pieces for Grad-CAM
-        self.features = base.features
-        self.avgpool = base.avgpool
-        self.classifier = base.classifier
 
     def forward(self, x):
-        x = self.features(x)
-        x = self.avgpool(x)
-        x = torch.flatten(x, 1)
-        return self.classifier(x)
+        return self.base(x)
+    
+    @property
+    def features(self):
+        return self.base.features
+    
+    @property
+    def avgpool(self):
+        return self.base.avgpool
+    
+    @property
+    def classifier(self):
+        return self.base.classifier
 
-# Class names mapping
-CLASS_NAMES = ['CNV', 'DME', 'DRUSEN', 'NORMAL']
+# Create lifespan context manager
+@asynccontextmanager
+async def lifespan(app: FastAPI):
+    # Load the model on startup
+    global model, device, transform
+    
+    # Set device
+    device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
+    logger.info(f"Using device: {device}")
+    
+    # Initialize model
+    model = RetinalModel(num_classes=len(CLASS_NAMES)).to(device)
+    
+    # Create transform pipeline
+    transform = transforms.Compose([
+        transforms.Resize((IMG_SIZE, IMG_SIZE)),
+        transforms.ToTensor(),
+        transforms.Normalize([0.485, 0.456, 0.406],
+                             [0.229, 0.224, 0.225])
+    ])
+    
+    # Load model from local path
+    checkpoint_path = os.environ.get("MODEL_PATH", "./best_model.pth")
+    try:
+        if os.path.exists(checkpoint_path):
+            logger.info(f"Loading model from local path: {checkpoint_path}")
+            state_dict = torch.load(checkpoint_path, map_location=device)
+            model.load_state_dict(state_dict, strict=False)
+            logger.info(f"Successfully loaded model from {checkpoint_path} (non-strict)")
+        else:
+            logger.warning(f"Model not found at {checkpoint_path}. Using randomly initialized weights!")
+    except Exception as e:
+        logger.error(f"Error loading model: {str(e)}")
+        logger.warning("Using randomly initialized weights!")
+    
+    model.eval()
+    
+    yield
+    
+    # Cleanup on shutdown if needed
+    logger.info("Shutting down application")
 
-# Initialize FastAPI app
-app = FastAPI(title="Retinal OCT Image Analyzer API",
-              description="API for analyzing OCT retinal images and predicting disease categories",
-              version="1.0.0")
+# Initialize FastAPI app with lifespan
+app = FastAPI(
+    title="Retinal OCT Image Analyzer API",
+    description="API for analyzing OCT retinal images and predicting disease categories",
+    version="1.0.0",
+    lifespan=lifespan
+)
 
 # Add CORS middleware
 app.add_middleware(
@@ -68,58 +121,6 @@ app.add_middleware(
     allow_methods=["*"],  # Allows all methods
     allow_headers=["*"],  # Allows all headers
 )
-
-# Global variables
-IMG_SIZE = 224
-device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
-model = None
-
-# Transform pipeline
-transform = transforms.Compose([
-    transforms.Resize((IMG_SIZE, IMG_SIZE)),
-    transforms.ToTensor(),
-    transforms.Normalize([0.485, 0.456, 0.406],
-                         [0.229, 0.224, 0.225])
-])
-
-# Using FastAPI lifespan instead of on_event which is deprecated
-"""
-@app.on_event("startup")
-async def load_model():
-    global model
-    # Initialize the model
-    model = RetinalModel(num_classes=len(CLASS_NAMES)).to(device)
-    
-    # Load checkpoint (update path for your deployment)
-    # checkpoint_path = "./best_model.pth"
-    # Load checkpoint (update path for your deployment)
-    checkpoint_path = os.environ.get("MODEL_PATH", "./best_model.pth")
-
-    try:
-        if os.path.exists(checkpoint_path):
-            model.load_state_dict(torch.load(checkpoint_path, map_location=device))
-            print(f"Loaded model weights from {checkpoint_path}")
-        else:
-            print(f"Warning: Checkpoint file {checkpoint_path} not found. Using randomly initialized weights.")
-        model.eval()  # Set to evaluation mode
-    except Exception as e:
-        print(f"Error loading model: {e}")
-        # Initialize with random weights if checkpoint not found
-        model.eval()
-    """
-@app.on_event("startup")
-async def load_model():
-    global model
-    model = RetinalModel(num_classes=len(CLASS_NAMES)).to(device)
-
-    checkpoint_path = hf_hub_download(
-        repo_id="mryamusa/oct-image-analyzer",
-        filename="best_model.pth",
-        repo_type="model"
-    )
-
-    model.load_state_dict(torch.load(checkpoint_path, map_location=device))
-    model.eval()
 
 def generate_grad_cam(model, img_tensor, target_class=None):
     """Generate Grad-CAM for the given image tensor"""
@@ -239,20 +240,39 @@ async def predict(file: UploadFile = File(...)):
         return response
         
     except Exception as e:
+        logger.error(f"Error processing image: {str(e)}")
         raise HTTPException(status_code=500, detail=f"Error processing image: {str(e)}")
 
 @app.get("/")
 async def root():
     """Root endpoint"""
-    return FileResponse("static/index.html")
-    # return {"message": "OCT Image Analysis API. POST an image to /predict/ to get predictions."}
+    return {"message": "Welcome to Retinal OCT Image Analyzer API", 
+            "docs_url": "/docs", 
+            "endpoints": {
+                "predict": "/predict/"
+            }}
 
-# Mount static files directory
-app.mount("/static", StaticFiles(directory="static"), name="static")
+# Mount static files directory if it exists
+if os.path.exists("static"):
+    app.mount("/static", StaticFiles(directory="static"), name="static")
+    
+    @app.get("/ui")
+    async def serve_ui():
+        """Serve the UI if available"""
+        if os.path.exists("static/index.html"):
+            return FileResponse("static/index.html")
+        else:
+            return {"message": "UI not available, try the API at /predict/"}
 
 if __name__ == "__main__":
     import uvicorn
     # Get port from environment variable for Heroku compatibility
-    port = int(os.environ.get("PORT", 8000))
+    port = os.environ.get("PORT", 8000)
+    
+    # Configure host with fallback for different environments
+    host = "127.0.0.1"  # Use localhost for safety
+    
+    logger.info(f"Starting server on {host}:{port}")
+    
     # Run app with uvicorn
-    uvicorn.run("app:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app:app", host=host, port=port)

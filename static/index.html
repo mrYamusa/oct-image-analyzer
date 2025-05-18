@@ -101,12 +101,54 @@
         text-align: center;
         margin-top: 10px;
       }
+      .info-section {
+        background-color: #f0f7fa;
+        padding: 20px;
+        border-radius: 5px;
+        margin-bottom: 20px;
+      }
+      .disease-info {
+        margin-top: 20px;
+      }
     </style>
   </head>
   <body>
-    <h1>OCT Image Analysis</h1>
+    <h1>Retinal OCT Image Analysis</h1>
 
     <div class="container">
+      <div class="info-section">
+        <h2>About this Tool</h2>
+        <p>
+          This application analyzes Optical Coherence Tomography (OCT) images of
+          the retina to predict potential conditions:
+        </p>
+        <div class="disease-info">
+          <ul>
+            <li>
+              <strong>CNV (Choroidal Neovascularization)</strong>: Abnormal
+              growth of blood vessels under the retina from the choroid.
+            </li>
+            <li>
+              <strong>DME (Diabetic Macular Edema)</strong>: Swelling in the
+              macula of patients with diabetic retinopathy.
+            </li>
+            <li>
+              <strong>DRUSEN</strong>: Yellow deposits under the retina, often
+              associated with age-related macular degeneration.
+            </li>
+            <li>
+              <strong>NORMAL</strong>: Healthy retinal tissue with no pathology.
+            </li>
+          </ul>
+        </div>
+        <p>
+          <em
+            >Note: This tool is for educational purposes only and should not
+            replace professional medical advice.</em
+          >
+        </p>
+      </div>
+
       <div class="upload-section">
         <h2>Upload an OCT Image</h2>
         <p>Upload a retinal OCT image to analyze and predict the condition.</p>
@@ -167,8 +209,8 @@
         const heatmapImage = document.getElementById("heatmap-image");
         const overlayImage = document.getElementById("overlay-image");
 
-        // API endpoint
-        const apiUrl = "http://localhost:8000/predict/";
+        // Use relative URL for API endpoint to work in any deployment environment
+        const apiUrl = "/predict/";
 
         submitBtn.addEventListener("click", async function () {
           // Check if file is selected
