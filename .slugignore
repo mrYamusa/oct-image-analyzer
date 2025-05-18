@@ -1,15 +1,15 @@
 # .slugignore
-*.log
-*.md
-*.csv
-*.pyc
-*.git
-*.DS_Store
+
+_.log
+_.md
+_.csv
+_.pyc
+_.git
+_.DS_Store
 best_model.pth
-*.psd
-*.pdf
+_.psd
+_.pdf
 /tests
 /docs
-*.md
+\*.md
 /examples
-*.txt
