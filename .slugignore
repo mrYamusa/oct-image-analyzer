@@ -6,7 +6,6 @@ _.csv
 _.pyc
 _.git
 _.DS_Store
-best_model.pth
 _.psd
 _.pdf
 /tests

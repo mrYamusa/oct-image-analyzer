@@ -29,6 +29,5 @@ build/
 Thumbs.db
 
 # PyTorch models (depending on size, you might want to add to Heroku separately)
-*.pth
 *.pt
 *.bin
